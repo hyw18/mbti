@@ -74,7 +74,7 @@
 
           {% if rankings %}
           <section class="ranking-section">
-            <h2 class="section-title">순위표 <span>상위 5위</span></h2>
+            <h2 class="section-title">순위표 <span>상위 5위 + 내 순위</span></h2>
             <div class="ranking-controls">
               <button class="filter-btn" onclick="sortRanking('difference', 'asc')">격차 ↑</button>
               <button class="filter-btn" onclick="sortRanking('final_score', 'desc')">최종점수 ↓</button>
@@ -87,6 +87,7 @@
                     <th>닉네임</th>
                     <th>격차</th>
                     <th>최종점수</th>
+                    <th>내 위치</th>
                   </tr>
                 </thead>
                 <tbody id="ranking-body">
@@ -98,6 +99,7 @@
 
           <script>
             let rankingsData = {{ rankings|tojson }};
+            let currentEntryId = {{ current_entry_id|default(none)|tojson }};
 
             function sortRanking(key, direction) {
               let sorted = [...rankingsData].sort((a, b) => {
@@ -109,18 +111,42 @@
                   return bVal - aVal;
                 }
               });
+              let ranked = sorted.map((entry, idx) => ({ ...entry, rank: idx + 1 }));
+              let currentEntry = ranked.find((entry) => entry.id === currentEntryId);
+              let visibleRows = ranked.slice(0, 5);
+              let totalUsers = ranked.length;
+
+              if (currentEntry && !visibleRows.some((entry) => entry.id === currentEntry.id)) {
+                visibleRows.push({ isGap: true });
+                visibleRows.push(currentEntry);
+              }
 
               let tableBody = document.getElementById('ranking-body');
               tableBody.innerHTML = '';
 
-              sorted.slice(0, 5).forEach((entry, idx) => {
+              visibleRows.forEach((entry) => {
                 let row = document.createElement('tr');
+                if (entry.isGap) {
+                  row.className = 'ranking-gap-row';
+                  row.innerHTML = '<td colspan="5">내 순위까지 표시</td>';
+                  tableBody.appendChild(row);
+                  return;
+                }
+                let isCurrentEntry = entry.id === currentEntryId;
+                let percentile = isCurrentEntry ? ((entry.rank / totalUsers) * 100).toFixed(2).replace(/\.?0+$/, '') : '';
+                if (isCurrentEntry) {
+                  row.classList.add('current-rank-row');
+                }
                 row.innerHTML = `
-                  <td class="rank">${idx + 1}</td>
-                  <td class="name">${entry.nickname}</td>
+                  <td class="rank">${entry.rank}</td>
+                  <td class="name">${entry.nickname}<span class="current-rank-badge">내 순위</span></td>
                   <td>${entry.difference.toFixed(2)}</td>
                   <td>${entry.final_score.toFixed(2)}</td>
+                  <td class="percentile">${percentile ? `상위 ${percentile}%` : ''}</td>
                 `;
+                if (!isCurrentEntry) {
+                  row.querySelector('.current-rank-badge').remove();
+                }
                 tableBody.appendChild(row);
               });
             }

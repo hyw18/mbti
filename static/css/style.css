@@ -362,6 +362,48 @@ select {
   box-shadow: 0 10px 22px rgba(111, 93, 170, 0.11);
 }
 
+.ranking-table tbody tr.current-rank-row {
+  box-shadow: 0 14px 30px rgba(96, 64, 200, 0.22);
+}
+
+.ranking-table tbody tr.current-rank-row td {
+  background: #f6f1ff;
+  border-top: 2px solid #a98dff;
+  border-bottom: 2px solid #a98dff;
+}
+
+.ranking-table tbody tr.current-rank-row td:first-child {
+  border-left: 2px solid #a98dff;
+}
+
+.ranking-table tbody tr.current-rank-row td:last-child {
+  border-right: 2px solid #a98dff;
+}
+
+.current-rank-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--white);
+  background: var(--purple-deep);
+  font-size: 0.72rem;
+  font-weight: 900;
+  vertical-align: middle;
+}
+
+.ranking-table tbody tr.ranking-gap-row {
+  box-shadow: none;
+}
+
+.ranking-table tbody tr.ranking-gap-row td {
+  padding: 4px 16px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .ranking-table tbody td:first-child {
   border-radius: 16px 0 0 16px;
 }
@@ -378,6 +420,12 @@ select {
 .ranking-table .name {
   text-align: center;
   font-weight: 800;
+}
+
+.ranking-table .percentile {
+  color: var(--purple-deep);
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {

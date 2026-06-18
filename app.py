@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from uuid import uuid4
 import venv
 
 
@@ -195,7 +196,7 @@ def index():
             stage_description = '특별히 안 맞는 건 아니지만, 엄청난 끌림보다는 천천히 맞춰가는 타입이에요. 대화와 배려가 있으면 충분히 좋은 관계가 될 수 있어요.'
         elif 30 <= score <= 49:
             stage_emoji = '😅'
-            stage_label = '뻬걱 궁합'
+            stage_label = '유의 궁합'
             stage_description = '친해질 수는 있지만 생각보다 오해가 자주 생길 수 있어요. 감정 표현 방식이나 생활 텐션 차이를 조심해야 해요.'
         elif 10 <= score <= 29:
             stage_emoji = '⚠️'
@@ -211,7 +212,9 @@ def index():
         difference = abs(score - expected_score_float)
         
         # 순위 데이터 저장
+        current_entry_id = uuid4().hex
         ranking_entry = {
+            'id': current_entry_id,
             'nickname': nickname,
             'expected_score': expected_score_float,
             'final_score': score,
@@ -231,7 +234,7 @@ def index():
                                score=score_display, stage_emoji=stage_emoji, stage_label=stage_label,
                                stage_description=stage_description, mbtis=MBTIS, expected_score=expected_score,
                                final_score=final_score, nickname=nickname, rankings=rankings, general=general, relationship=relationship,
-                               conflict=conflict, expression=expression)
+                               conflict=conflict, expression=expression, current_entry_id=current_entry_id)
     return render_template('index.html', mbtis=MBTIS, rankings=rankings)
 
 

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MBTI 궁합 연구소</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  </head>
+  <body>
+    <main class="page-shell">
+      <section class="card app-card">
+        {% if score is not defined %}
+        <header class="page-header">
+          <p class="eyebrow">Love Type Lab</p>
+          <h1 class="page-title">💘 MBTI 궁합 연구소</h1>
+          <p class="page-description">나와 상대방의 MBTI로 연애 궁합을 분석해보세요.</p>
+        </header>
+        {% endif %}
+
+        {% if score is defined %}
+        <div class="result">
+          {% if nickname %}
+          <p class="result-title">{{ nickname }}님의 MBTI 궁합 결과</p>
+          {% endif %}
+          <div class="score-big">{{ score }}%</div>
+          <div class="result-badge">{{ stage_emoji }} {{ stage_label }}</div>
+          <p class="stage-description">{{ stage_description }}</p>
+
+          <div class="detail-grid">
+            <div class="detail-card">
+              <span class="detail-label">일반 호환성</span>
+              <strong class="detail-score">{{ general }}</strong>
+            </div>
+            <div class="detail-card">
+              <span class="detail-label">연인관계</span>
+              <strong class="detail-score">{{ relationship }}</strong>
+            </div>
+            <div class="detail-card">
+              <span class="detail-label">갈등회복력</span>
+              <strong class="detail-score">{{ conflict }}</strong>
+            </div>
+            <div class="detail-card">
+              <span class="detail-label">표현방식</span>
+              <strong class="detail-score">{{ expression }}</strong>
+            </div>
+          </div>
+
+          {% if expected_score != '' %}
+          <section class="progress-box">
+            <h2 class="section-title">점수 비교</h2>
+            <div class="compare-row">
+              <span>예상 점수</span>
+              <strong>{{ expected_score }}%</strong>
+            </div>
+            <div class="compare-row">
+              <span>실제 점수</span>
+              <strong>{{ score }}%</strong>
+            </div>
+            <div class="progress" aria-label="실제 점수">
+              <div class="progress-fill" style="width: {{ final_score }}%;"></div>
+            </div>
+            <p class="difference-text">
+              차이:
+              {% if expected_score|float == score|float %}
+              <span class="match">일치!</span>
+              {% else %}
+              <span>{{ "%.2f" | format((score|float - expected_score|float)|abs) }}점 차이</span>
+              {% endif %}
+            </p>
+          </section>
+          {% endif %}
+
+          <button class="main-btn secondary-btn" type="button" onclick="window.location='/'">다시 선택하기</button>
+
+          {% if rankings %}
+          <section class="ranking-section">
+            <h2 class="section-title">순위표 <span>상위 5위</span></h2>
+            <div class="ranking-controls">
+              <button class="filter-btn" onclick="sortRanking('difference', 'asc')">격차 ↑</button>
+              <button class="filter-btn" onclick="sortRanking('final_score', 'desc')">최종점수 ↓</button>
+            </div>
+            <div class="table-wrap">
+              <table class="ranking-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>닉네임</th>
+                    <th>격차</th>
+                    <th>최종점수</th>
+                  </tr>
+                </thead>
+                <tbody id="ranking-body">
+                </tbody>
+              </table>
+            </div>
+          </section>
+          {% endif %}
+
+          <script>
+            let rankingsData = {{ rankings|tojson }};
+
+            function sortRanking(key, direction) {
+              let sorted = [...rankingsData].sort((a, b) => {
+                let aVal = a[key];
+                let bVal = b[key];
+                if (direction === 'asc') {
+                  return aVal - bVal;
+                } else {
+                  return bVal - aVal;
+                }
+              });
+
+              let tableBody = document.getElementById('ranking-body');
+              tableBody.innerHTML = '';
+
+              sorted.slice(0, 5).forEach((entry, idx) => {
+                let row = document.createElement('tr');
+                row.innerHTML = `
+                  <td class="rank">${idx + 1}</td>
+                  <td class="name">${entry.nickname}</td>
+                  <td>${entry.difference.toFixed(2)}</td>
+                  <td>${entry.final_score.toFixed(2)}</td>
+                `;
+                tableBody.appendChild(row);
+              });
+            }
+
+            if (rankingsData && rankingsData.length > 0) {
+              sortRanking('difference', 'asc');
+            }
+          </script>
+        </div>
+        {% else %}
+        <form class="form-panel" method="post">
+          <label>
+            <span>첫 번째 MBTI</span>
+            <select name="mbti1" required>
+              <option value="">선택하세요</option>
+              {% for m in mbtis %}
+              <option>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>
+            <span>두 번째 MBTI</span>
+            <select name="mbti2" required>
+              <option value="">선택하세요</option>
+              {% for m in mbtis %}
+              <option>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>
+            <span>닉네임</span>
+            <input type="text" name="nickname" placeholder="당신의 닉네임 입력">
+          </label>
+
+          <label>
+            <span>예상 점수 (0~100)</span>
+            <div class="score-control">
+              <button class="score-btn" type="button" onclick="adjustScore(-10)">-10</button>
+              <button class="score-btn" type="button" onclick="adjustScore(-1)">-1</button>
+              <input type="number" id="expected_score" name="expected_score" min="0" max="100" step="0.01" placeholder="예: 75.5" oninput="validateScore(this)">
+              <button class="score-btn" type="button" onclick="adjustScore(1)">+1</button>
+              <button class="score-btn" type="button" onclick="adjustScore(10)">+10</button>
+            </div>
+          </label>
+
+          <button class="main-btn" type="submit" onclick="return validateForm(event)">궁합 보기</button>
+
+          <script>
+            function validateScore(input) {
+              if (input.value === '') return;
+              let val = input.value;
+              let parts = val.split('.');
+              if (parts.length > 1 && parts[1].length > 2) {
+                input.value = parseFloat(val).toFixed(2);
+              }
+              if (parseFloat(val) > 100) input.value = 100;
+              if (parseFloat(val) < 0) input.value = 0;
+            }
+
+            function adjustScore(amount) {
+              let input = document.getElementById('expected_score');
+              let current = parseFloat(input.value) || 0;
+              let newVal = current + amount;
+              if (newVal > 100) newVal = 100;
+              if (newVal < 0) newVal = 0;
+              input.value = parseFloat(newVal.toFixed(2));
+            }
+
+            function validateForm(e) {
+              let nickname = document.querySelector('input[name="nickname"]').value.trim();
+              let expectedScore = document.querySelector('input[name="expected_score"]').value.trim();
+
+              if (nickname === '') {
+                alert('닉네임을 입력해주세요.');
+                return false;
+              }
+              if (expectedScore === '') {
+                alert('예상 점수를 입력해주세요.');
+                return false;
+              }
+              return true;
+            }
+          </script>
+        </form>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

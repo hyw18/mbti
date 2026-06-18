@@ -1,6 +1,7 @@
 import importlib.util
 import os
 from pathlib import Path
+import random
 import subprocess
 import sys
 from uuid import uuid4
@@ -60,7 +61,45 @@ from flask import Flask, render_template, request
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 # 순위 데이터 저장 (메모리)
-rankings = []
+VIRTUAL_RANKING_COUNT = 100
+MAX_RANKINGS = 200
+
+
+def build_virtual_rankings():
+    rng = random.Random(20260618)
+    family_names = [
+        '김', '이', '박', '최', '정', '강', '조', '윤', '장', '임',
+        '한', '오', '서', '신', '권', '황', '안', '송', '전', '홍',
+    ]
+    given_names = [
+        '민준', '서준', '도윤', '예준', '시우', '주원', '하준', '지호', '지후', '준서',
+        '서연', '서윤', '지우', '서현', '민서', '하은', '하윤', '윤서', '지민', '채원',
+        '유진', '수아', '다은', '예은', '나윤', '현우', '지훈', '건우', '우진', '도현',
+        '민재', '현서', '아린', '다현', '소윤', '연우', '지아', '채은', '유나', '가은',
+        '태민', '승현', '재윤', '은우', '시온', '하람', '도하', '이준', '준우', '윤재',
+    ]
+    name_pool = [f'{family}{given}' for family in family_names for given in given_names]
+    rng.shuffle(name_pool)
+
+    virtual_rankings = []
+    for index, name in enumerate(name_pool[:VIRTUAL_RANKING_COUNT], start=1):
+        final_score = round(rng.uniform(1, 100), 2)
+        expected_score = round(rng.uniform(0, 100), 2)
+        virtual_rankings.append({
+            'id': f'virtual-{index:03d}',
+            'nickname': name,
+            'expected_score': expected_score,
+            'final_score': final_score,
+            'difference': abs(final_score - expected_score),
+            'general': rng.randint(1, 100),
+            'relationship': rng.randint(1, 100),
+            'conflict': rng.randint(1, 100),
+            'expression': rng.randint(1, 100),
+        })
+    return virtual_rankings
+
+
+rankings = build_virtual_rankings()
 
 # 실제 표를 바탕으로 한 MBTI 리스트와 2차원 딕셔너리
 MBTIS = [
@@ -226,8 +265,8 @@ def index():
         }
         rankings.insert(0, ranking_entry)
         
-        # 최대 100개까지만 유지
-        if len(rankings) > 100:
+        # 가상 데이터 100명과 실제 제출 데이터를 함께 유지
+        if len(rankings) > MAX_RANKINGS:
             rankings.pop()
 
         return render_template('index.html', mbti1=mbti1, mbti2=mbti2,

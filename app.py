@@ -1,10 +1,8 @@
 import importlib.util
 import os
 from pathlib import Path
-import random
 import subprocess
 import sys
-from uuid import uuid4
 import venv
 
 
@@ -21,7 +19,6 @@ def venv_python():
     if os.name == 'nt':
         return VENV_DIR / 'Scripts' / 'python.exe'
     return VENV_DIR / 'bin' / 'python'
-
 
 def install_packages(python_executable):
     subprocess.check_call([str(python_executable), '-m', 'pip', 'install', '--upgrade', 'pip'])
@@ -60,52 +57,104 @@ from flask import Flask, render_template, request
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
-# 순위 데이터 저장 (메모리)
-VIRTUAL_RANKING_COUNT = 100
-MAX_RANKINGS = 200
-
-
-def build_virtual_rankings():
-    rng = random.Random(20260618)
-    family_names = [
-        '김', '이', '박', '최', '정', '강', '조', '윤', '장', '임',
-        '한', '오', '서', '신', '권', '황', '안', '송', '전', '홍',
-    ]
-    given_names = [
-        '민준', '서준', '도윤', '예준', '시우', '주원', '하준', '지호', '지후', '준서',
-        '서연', '서윤', '지우', '서현', '민서', '하은', '하윤', '윤서', '지민', '채원',
-        '유진', '수아', '다은', '예은', '나윤', '현우', '지훈', '건우', '우진', '도현',
-        '민재', '현서', '아린', '다현', '소윤', '연우', '지아', '채은', '유나', '가은',
-        '태민', '승현', '재윤', '은우', '시온', '하람', '도하', '이준', '준우', '윤재',
-    ]
-    name_pool = [f'{family}{given}' for family in family_names for given in given_names]
-    rng.shuffle(name_pool)
-
-    virtual_rankings = []
-    for index, name in enumerate(name_pool[:VIRTUAL_RANKING_COUNT], start=1):
-        final_score = round(rng.uniform(1, 100), 2)
-        expected_score = round(rng.uniform(0, 100), 2)
-        virtual_rankings.append({
-            'id': f'virtual-{index:03d}',
-            'nickname': name,
-            'expected_score': expected_score,
-            'final_score': final_score,
-            'difference': abs(final_score - expected_score),
-            'general': rng.randint(1, 100),
-            'relationship': rng.randint(1, 100),
-            'conflict': rng.randint(1, 100),
-            'expression': rng.randint(1, 100),
-        })
-    return virtual_rankings
-
-
-rankings = build_virtual_rankings()
-
 # 실제 표를 바탕으로 한 MBTI 리스트와 2차원 딕셔너리
 MBTIS = [
     'ISTJ','ISFJ','INFJ','INTJ','ISTP','ISFP','INFP','INTP',
     'ESTP','ESFP','ENFP','ENTP','ESTJ','ESFJ','ENFJ','ENTJ'
 ]
+
+GENDER_WEIGHTS = {
+    'male-male': {
+        'compatibility': 0.40,
+        'duration': 0.24,
+        'recovery': 0.19,
+        'expression': 0.17,
+    },
+    'male-female': {
+        'compatibility': 0.40,
+        'duration': 0.23,
+        'recovery': 0.19,
+        'expression': 0.18,
+    },
+    'male-none': {
+        'compatibility': 0.40,
+        'duration': 0.24,
+        'recovery': 0.19,
+        'expression': 0.17,
+    },
+    'female-male': {
+        'compatibility': 0.40,
+        'duration': 0.22,
+        'recovery': 0.20,
+        'expression': 0.18,
+    },
+    'female-female': {
+        'compatibility': 0.40,
+        'duration': 0.21,
+        'recovery': 0.20,
+        'expression': 0.19,
+    },
+    'female-none': {
+        'compatibility': 0.40,
+        'duration': 0.22,
+        'recovery': 0.20,
+        'expression': 0.18,
+    },
+}
+
+VALID_MY_GENDERS = {'male', 'female'}
+VALID_PARTNER_GENDERS = {'male', 'female', 'none'}
+
+SCORE_GROUPS = (
+    {
+        'label': '90점 이상',
+        'title': '최상 궁합',
+        'description': '대화, 안정감, 표현 방식이 고르게 잘 맞아 자연스럽게 가까워지기 좋아요.',
+        'color_class': 'score-blue',
+        'min_score': 90,
+        'max_score': None,
+    },
+    {
+        'label': '80점 이상',
+        'title': '좋은 궁합',
+        'description': '큰 흐름이 잘 맞고 관계를 이어갈 때 부담이 비교적 적은 편이에요.',
+        'color_class': 'score-mint',
+        'min_score': 80,
+        'max_score': 90,
+    },
+    {
+        'label': '65점 이상',
+        'title': '무난한 궁합',
+        'description': '기본 궁합은 괜찮지만 서로의 차이를 알고 맞춰가면 더 좋아져요.',
+        'color_class': 'score-green',
+        'min_score': 65,
+        'max_score': 80,
+    },
+    {
+        'label': '50점 이상',
+        'title': '조율 필요',
+        'description': '관계가 좋아지려면 대화 방식과 갈등 해결 습관을 의식적으로 맞춰야 해요.',
+        'color_class': 'score-yellow',
+        'min_score': 50,
+        'max_score': 65,
+    },
+    {
+        'label': '30점 이상',
+        'title': '주의 필요',
+        'description': '서로의 기준이 달라 오해가 쌓이기 쉬우니 천천히 확인하는 편이 좋아요.',
+        'color_class': 'score-red',
+        'min_score': 30,
+        'max_score': 50,
+    },
+    {
+        'label': '30점 미만',
+        'title': '거리 조절 필요',
+        'description': '성향 차이가 크게 느껴질 수 있어 관계 속도를 아주 천천히 잡는 편이 좋아요.',
+        'color_class': 'score-purple-dark',
+        'min_score': 0,
+        'max_score': 30,
+    },
+)
 
 # 실제 표를 바탕으로 한 2차원 딕셔너리 (행: 나, 열: 상대)
 COMPAT = {
@@ -197,84 +246,144 @@ def format_score(score):
     formatted = f"{rounded:.2f}".rstrip('0')
     return formatted
 
+
+def calculate_final_score(scores, my_gender, partner_gender):
+    relation_key = f'{my_gender}-{partner_gender}'
+    weights = GENDER_WEIGHTS.get(relation_key)
+    if weights is None:
+        raise ValueError('올바르지 않은 성별 선택값입니다.')
+
+    return (
+        scores['compatibility'] * weights['compatibility']
+        + scores['duration'] * weights['duration']
+        + scores['recovery'] * weights['recovery']
+        + scores['expression'] * weights['expression']
+    )
+
+
+def get_score_stage(score):
+    if score >= 90:
+        return '최상 궁합'
+    if score >= 80:
+        return '좋은 궁합'
+    if score >= 65:
+        return '무난한 궁합'
+    if score >= 50:
+        return '조율이 필요한 궁합'
+    if score >= 30:
+        return '주의가 필요한 궁합'
+    return '거리 조절이 필요한 궁합'
+
+
+def get_result_description(score):
+    if score >= 90:
+        return '서로의 강점이 자연스럽게 맞물려 안정감과 설렘을 함께 기대할 수 있어요.'
+    if score >= 80:
+        return '큰 흐름이 잘 맞는 편이라 대화와 생활 리듬을 맞추기 수월해요.'
+    if score >= 65:
+        return '기본 궁합은 괜찮지만 표현 방식과 갈등 해결 습관을 맞추면 더 좋아져요.'
+    if score >= 50:
+        return '관계가 굴러가려면 서로의 차이를 의식적으로 조율하는 과정이 필요해요.'
+    if score >= 30:
+        return '끌림과 별개로 반복되는 오해가 생기기 쉬워 천천히 확인하는 편이 좋아요.'
+    return '관계 속도를 늦추고 서로의 기준을 충분히 확인하는 과정이 필요해요.'
+
+
+def build_match_result(my_mbti, other_mbti, my_gender, partner_gender):
+    general = COMPAT[my_mbti][other_mbti]
+    relationship = RELATIONSHIP[my_mbti][other_mbti]
+    conflict = CONFLICT[my_mbti][other_mbti]
+    expression = EXPRESSION[my_mbti][other_mbti]
+    scores = {
+        'compatibility': general,
+        'duration': relationship,
+        'recovery': conflict,
+        'expression': expression,
+    }
+    total = calculate_final_score(scores, my_gender, partner_gender)
+    return {
+        'mbti': other_mbti,
+        'total': total,
+        'total_display': format_score(total),
+        'stage': get_score_stage(total),
+        'description': get_result_description(total),
+        'general': general,
+        'relationship': relationship,
+        'conflict': conflict,
+        'expression': expression,
+    }
+
+
+def add_factor_highlights(matches):
+    factor_keys = ('general', 'relationship', 'conflict', 'expression')
+    factor_ranges = {
+        key: {
+            'max': max(match[key] for match in matches),
+            'min': min(match[key] for match in matches),
+        }
+        for key in factor_keys
+    }
+
+    for match in matches:
+        match['factor_highlights'] = {}
+        for key in factor_keys:
+            if match[key] == factor_ranges[key]['max']:
+                match['factor_highlights'][key] = 'factor-high'
+            elif match[key] == factor_ranges[key]['min']:
+                match['factor_highlights'][key] = 'factor-low'
+            else:
+                match['factor_highlights'][key] = ''
+
+
+def group_matches_by_score(matches):
+    groups = []
+    for score_group in SCORE_GROUPS:
+        group_matches = [
+            match
+            for match in matches
+            if match['total'] >= score_group['min_score']
+            and (score_group['max_score'] is None or match['total'] < score_group['max_score'])
+        ]
+        groups.append({**score_group, 'matches': group_matches})
+    return groups
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        mbti1 = request.form.get('mbti1')   
-        mbti2 = request.form.get('mbti2')
-        expected_score = request.form.get('expected_score', '')
-        nickname = request.form.get('nickname', '')
+        my_mbti = request.form.get('my_mbti', '').upper()
+        my_gender = request.form.get('myGender', '')
+        partner_gender = request.form.get('partnerGender', 'none')
+        if partner_gender not in VALID_PARTNER_GENDERS:
+            partner_gender = 'none'
 
-        # 각 점수 조회 (기본값 50)
-        general = COMPAT.get(mbti1, {}).get(mbti2, 50)
-        relationship = RELATIONSHIP.get(mbti1, {}).get(mbti2, 50)
-        conflict = CONFLICT.get(mbti1, {}).get(mbti2, 50)
-        expression = EXPRESSION.get(mbti1, {}).get(mbti2, 50)
+        if my_mbti not in MBTIS:
+            return render_template('index.html', mbtis=MBTIS, error='올바른 MBTI를 선택해주세요.'), 400
+        if my_gender not in VALID_MY_GENDERS:
+            return render_template(
+                'index.html',
+                mbtis=MBTIS,
+                error='본인 성별을 선택해주세요.',
+                selected_mbti=my_mbti,
+                selected_partner_gender=partner_gender,
+            ), 400
 
-        # 최종 점수 계산: (일반 * 2 + 연인관계 + 갈등회복력 + 표현방식) / 5
-        final_score = (general * 2 + relationship + conflict + expression) / 5
-        score = final_score
-        score_display = format_score(final_score)
+        matches = [
+            build_match_result(my_mbti, other_mbti, my_gender, partner_gender)
+            for other_mbti in MBTIS
+        ]
+        add_factor_highlights(matches)
+        matches.sort(key=lambda match: (-match['total'], match['mbti']))
+        for rank, match in enumerate(matches, start=1):
+            match['rank'] = rank
 
-        # 점수에 따른 단계 결정
-        if 90 <= score <= 100:
-            stage_emoji = '❤️'
-            stage_label = '운명 궁합'
-            stage_description = '서로의 장점이 강하게 살아나는 조합이에요. 처음부터 대화가 잘 통하고, 함께 있을수록 에너지가 커질 가능성이 높아요.'
-        elif 80 <= score <= 89:
-            stage_emoji = '😊'
-            stage_label = '찰떡 궁합'
-            stage_description = '성향 차이가 있어도 오히려 매력으로 느껴지기 쉬워요. 서로를 존중하면 안정적이고 즐거운 관계가 될 수 있어요.'
-        elif 70 <= score <= 79:
-            stage_emoji = '🙂'
-            stage_label = '좋은 궁합'
-            stage_description = '큰 충돌 없이 자연스럽게 가까워질 수 있는 조합이에요. 서로의 다른 점을 이해하면 오래 가기 좋아요.'
-        elif 50 <= score <= 69:
-            stage_emoji = '😐'
-            stage_label = '무난한 궁합'
-            stage_description = '특별히 안 맞는 건 아니지만, 엄청난 끌림보다는 천천히 맞춰가는 타입이에요. 대화와 배려가 있으면 충분히 좋은 관계가 될 수 있어요.'
-        elif 30 <= score <= 49:
-            stage_emoji = '😅'
-            stage_label = '유의 궁합'
-            stage_description = '친해질 수는 있지만 생각보다 오해가 자주 생길 수 있어요. 감정 표현 방식이나 생활 텐션 차이를 조심해야 해요.'
-        elif 10 <= score <= 29:
-            stage_emoji = '⚠️'
-            stage_label = '충돌 주의 궁합'
-            stage_description = '서로의 기준이 많이 달라서 피로감이 쌓이기 쉬워요. 관계를 이어가려면 솔직한 대화와 거리 조절이 중요해요.'
-        else:
-            stage_emoji = '💔'
-            stage_label = '극과 극 궁합'
-            stage_description = '강하게 끌릴 수도 있지만, 오래 지내면 성향 차이가 크게 느껴질 수 있어요. 서로를 바꾸려 하기보다 차이를 인정하는 태도가 필요해요.'
-
-        # 예상 점수 변환
-        expected_score_float = float(expected_score) if expected_score else 0
-        difference = abs(score - expected_score_float)
-        
-        # 순위 데이터 저장
-        current_entry_id = uuid4().hex
-        ranking_entry = {
-            'id': current_entry_id,
-            'nickname': nickname,
-            'expected_score': expected_score_float,
-            'final_score': score,
-            'difference': difference,
-            'general': general,
-            'relationship': relationship,
-            'conflict': conflict,
-            'expression': expression
-        }
-        rankings.insert(0, ranking_entry)
-        
-        # 가상 데이터 100명과 실제 제출 데이터를 함께 유지
-        if len(rankings) > MAX_RANKINGS:
-            rankings.pop()
-
-        return render_template('index.html', mbti1=mbti1, mbti2=mbti2,
-                               score=score_display, stage_emoji=stage_emoji, stage_label=stage_label,
-                               stage_description=stage_description, mbtis=MBTIS, expected_score=expected_score,
-                               final_score=final_score, nickname=nickname, rankings=rankings, general=general, relationship=relationship,
-                               conflict=conflict, expression=expression, current_entry_id=current_entry_id)
-    return render_template('index.html', mbtis=MBTIS, rankings=rankings)
+        return render_template(
+            'index.html',
+            mbtis=MBTIS,
+            my_mbti=my_mbti,
+            match_groups=group_matches_by_score(matches),
+        )
+    return render_template('index.html', mbtis=MBTIS)
 
 
 if __name__ == '__main__':

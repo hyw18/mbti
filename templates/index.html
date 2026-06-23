@@ -9,232 +9,192 @@
   <body>
     <main class="page-shell">
       <section class="card app-card">
-        {% if score is not defined %}
+        {% if match_groups is not defined %}
         <header class="page-header">
           <p class="eyebrow">Love Type Lab</p>
           <h1 class="page-title">💘 MBTI 궁합 연구소</h1>
-          <p class="page-description">나와 상대방의 MBTI로 연애 궁합을 분석해보세요.</p>
+          <p class="page-description">나의 MBTI를 선택하고 잘 맞는 유형과 주의할 유형을 확인해보세요.</p>
         </header>
-        {% endif %}
 
-        {% if score is defined %}
-        <div class="result">
-          {% if nickname %}
-          <p class="result-title">{{ nickname }}님의 MBTI 궁합 결과</p>
-          {% endif %}
-          <div class="score-big">{{ score }}%</div>
-          <div class="result-badge">{{ stage_emoji }} {{ stage_label }}</div>
-          <p class="stage-description">{{ stage_description }}</p>
-
-          <div class="detail-grid">
-            <div class="detail-card">
-              <span class="detail-label">일반 호환성</span>
-              <strong class="detail-score">{{ general }}</strong>
-            </div>
-            <div class="detail-card">
-              <span class="detail-label">연인관계</span>
-              <strong class="detail-score">{{ relationship }}</strong>
-            </div>
-            <div class="detail-card">
-              <span class="detail-label">갈등회복력</span>
-              <strong class="detail-score">{{ conflict }}</strong>
-            </div>
-            <div class="detail-card">
-              <span class="detail-label">표현방식</span>
-              <strong class="detail-score">{{ expression }}</strong>
-            </div>
-          </div>
-
-          {% if expected_score != '' %}
-          <section class="progress-box">
-            <h2 class="section-title">점수 비교</h2>
-            <div class="compare-row">
-              <span>예상 점수</span>
-              <strong>{{ expected_score }}%</strong>
-            </div>
-            <div class="compare-row">
-              <span>실제 점수</span>
-              <strong>{{ score }}%</strong>
-            </div>
-            <div class="progress" aria-label="실제 점수">
-              <div class="progress-fill" style="width: {{ final_score }}%;"></div>
-            </div>
-            <p class="difference-text">
-              차이:
-              {% if expected_score|float == score|float %}
-              <span class="match">일치!</span>
-              {% else %}
-              <span>{{ "%.2f" | format((score|float - expected_score|float)|abs) }}점 차이</span>
-              {% endif %}
-            </p>
-          </section>
-          {% endif %}
-
-          <button class="main-btn secondary-btn" type="button" onclick="window.location='/'">다시 선택하기</button>
-
-          {% if rankings %}
-          <section class="ranking-section">
-            <h2 class="section-title">순위표 <span>상위 5위 + 내 순위</span></h2>
-            <div class="ranking-controls">
-              <button class="filter-btn" onclick="sortRanking('difference', 'asc')">격차 ↑</button>
-              <button class="filter-btn" onclick="sortRanking('final_score', 'desc')">최종점수 ↓</button>
-            </div>
-            <div class="table-wrap">
-              <table class="ranking-table">
-                <thead>
-                  <tr>
-                    <th>순위</th>
-                    <th>닉네임</th>
-                    <th>격차</th>
-                    <th>최종점수</th>
-                    <th>내 위치</th>
-                  </tr>
-                </thead>
-                <tbody id="ranking-body">
-                </tbody>
-              </table>
-            </div>
-          </section>
-          {% endif %}
-
-          <script>
-            let rankingsData = {{ rankings|tojson }};
-            let currentEntryId = {{ current_entry_id|default(none)|tojson }};
-
-            function sortRanking(key, direction) {
-              let sorted = [...rankingsData].sort((a, b) => {
-                let aVal = a[key];
-                let bVal = b[key];
-                if (direction === 'asc') {
-                  return aVal - bVal;
-                } else {
-                  return bVal - aVal;
-                }
-              });
-              let ranked = sorted.map((entry, idx) => ({ ...entry, rank: idx + 1 }));
-              let currentEntry = ranked.find((entry) => entry.id === currentEntryId);
-              let visibleRows = ranked.slice(0, 5);
-              let totalUsers = ranked.length;
-
-              if (currentEntry && !visibleRows.some((entry) => entry.id === currentEntry.id)) {
-                visibleRows.push({ isGap: true });
-                visibleRows.push(currentEntry);
-              }
-
-              let tableBody = document.getElementById('ranking-body');
-              tableBody.innerHTML = '';
-
-              visibleRows.forEach((entry) => {
-                let row = document.createElement('tr');
-                if (entry.isGap) {
-                  row.className = 'ranking-gap-row';
-                  row.innerHTML = '<td colspan="5">내 순위까지 표시</td>';
-                  tableBody.appendChild(row);
-                  return;
-                }
-                let isCurrentEntry = entry.id === currentEntryId;
-                let percentile = isCurrentEntry ? ((entry.rank / totalUsers) * 100).toFixed(2).replace(/\.?0+$/, '') : '';
-                if (isCurrentEntry) {
-                  row.classList.add('current-rank-row');
-                }
-                row.innerHTML = `
-                  <td class="rank">${entry.rank}</td>
-                  <td class="name">${entry.nickname}<span class="current-rank-badge">내 순위</span></td>
-                  <td>${entry.difference.toFixed(2)}</td>
-                  <td>${entry.final_score.toFixed(2)}</td>
-                  <td class="percentile">${percentile ? `상위 ${percentile}%` : ''}</td>
-                `;
-                if (!isCurrentEntry) {
-                  row.querySelector('.current-rank-badge').remove();
-                }
-                tableBody.appendChild(row);
-              });
-            }
-
-            if (rankingsData && rankingsData.length > 0) {
-              sortRanking('difference', 'asc');
-            }
-          </script>
-        </div>
-        {% else %}
         <form class="form-panel" method="post">
           <label>
             <span>나의 MBTI</span>
-            <select name="mbti1" required>
+            <select name="my_mbti" required>
               <option value="">선택하세요</option>
-              {% for m in mbtis %}
-              <option>{{ m }}</option>
+              {% for mbti in mbtis %}
+              <option value="{{ mbti }}" {% if selected_mbti == mbti %}selected{% endif %}>{{ mbti }}</option>
               {% endfor %}
             </select>
           </label>
-
-          <label>
-            <span>상대방의 MBTI</span>
-            <select name="mbti2" required>
-              <option value="">선택하세요</option>
-              {% for m in mbtis %}
-              <option>{{ m }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label>
-            <span>닉네임</span>
-            <input type="text" name="nickname" placeholder="당신의 닉네임 입력">
-          </label>
-
-          <label>
-            <span>예상 점수 (0~100)</span>
-            <div class="score-control">
-              <button class="score-btn" type="button" onclick="adjustScore(-10)">-10</button>
-              <button class="score-btn" type="button" onclick="adjustScore(-1)">-1</button>
-              <input type="number" id="expected_score" name="expected_score" min="0" max="100" step="0.01" placeholder="예: 75.5" oninput="validateScore(this)">
-              <button class="score-btn" type="button" onclick="adjustScore(1)">+1</button>
-              <button class="score-btn" type="button" onclick="adjustScore(10)">+10</button>
-            </div>
-          </label>
-
-          <button class="main-btn" type="submit" onclick="return validateForm(event)">궁합 보기</button>
-
-          <script>
-            function validateScore(input) {
-              if (input.value === '') return;
-              let val = input.value;
-              let parts = val.split('.');
-              if (parts.length > 1 && parts[1].length > 2) {
-                input.value = parseFloat(val).toFixed(2);
-              }
-              if (parseFloat(val) > 100) input.value = 100;
-              if (parseFloat(val) < 0) input.value = 0;
-            }
-
-            function adjustScore(amount) {
-              let input = document.getElementById('expected_score');
-              let current = parseFloat(input.value) || 0;
-              let newVal = current + amount;
-              if (newVal > 100) newVal = 100;
-              if (newVal < 0) newVal = 0;
-              input.value = parseFloat(newVal.toFixed(2));
-            }
-
-            function validateForm(e) {
-              let nickname = document.querySelector('input[name="nickname"]').value.trim();
-              let expectedScore = document.querySelector('input[name="expected_score"]').value.trim();
-
-              if (nickname === '') {
-                alert('닉네임을 입력해주세요.');
-                return false;
-              }
-              if (expectedScore === '') {
-                alert('예상 점수를 입력해주세요.');
-                return false;
-              }
-              return true;
-            }
-          </script>
+          <div class="gender-fields">
+            <label for="myGender">
+              <span>본인 성별</span>
+              <select id="myGender" name="myGender" required>
+                <option value="">선택하세요</option>
+                <option value="male">남성</option>
+                <option value="female">여성</option>
+              </select>
+            </label>
+            <label for="partnerGender">
+              <span>상대 성별</span>
+              <select id="partnerGender" name="partnerGender">
+                <option value="none" {% if selected_partner_gender in [none, "none"] %}selected{% endif %}>없음</option>
+                <option value="male" {% if selected_partner_gender == "male" %}selected{% endif %}>남성</option>
+                <option value="female" {% if selected_partner_gender == "female" %}selected{% endif %}>여성</option>
+              </select>
+            </label>
+          </div>
+          {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+          <button class="main-btn" type="submit">궁합 분석하기</button>
         </form>
+        {% else %}
+        <div class="result">
+          <header class="result-header">
+            <p class="eyebrow">{{ my_mbti }} Compatibility</p>
+            <h1 class="result-heading">{{ my_mbti }} 궁합 분석</h1>
+            <p class="page-description">16개 MBTI 전체를 종합 점수가 높은 순서대로 정리했어요.</p>
+          </header>
+
+          <div class="result-controls">
+            <div class="axis-filters" aria-label="MBTI 축별 검색">
+              <label for="energyFilter">
+                <span class="sr-only">E-I 선택</span>
+                <select id="energyFilter" class="mbti-axis-filter" data-index="0">
+                  <option value="">전체</option>
+                  <option value="E">E</option>
+                  <option value="I">I</option>
+                </select>
+              </label>
+              <label for="perceptionFilter">
+                <span class="sr-only">N-S 선택</span>
+                <select id="perceptionFilter" class="mbti-axis-filter" data-index="1">
+                  <option value="">전체</option>
+                  <option value="N">N</option>
+                  <option value="S">S</option>
+                </select>
+              </label>
+              <label for="decisionFilter">
+                <span class="sr-only">F-T 선택</span>
+                <select id="decisionFilter" class="mbti-axis-filter" data-index="2">
+                  <option value="">전체</option>
+                  <option value="F">F</option>
+                  <option value="T">T</option>
+                </select>
+              </label>
+              <label for="lifestyleFilter">
+                <span class="sr-only">J-P 선택</span>
+                <select id="lifestyleFilter" class="mbti-axis-filter" data-index="3">
+                  <option value="">전체</option>
+                  <option value="J">J</option>
+                  <option value="P">P</option>
+                </select>
+              </label>
+            </div>
+            <button class="sort-toggle-btn" id="sortToggle" type="button" data-direction="desc">낮은 점수순 보기</button>
+          </div>
+
+          <div id="matchGroups">
+          {% for group in match_groups %}
+          <section class="match-section score-group-section {{ group.color_class }}" data-group-index="{{ loop.index0 }}">
+            <header class="score-group-header">
+              <div>
+                <h2 class="match-section-title">{{ group.label }} <span>{{ group.title }}</span></h2>
+                <p>{{ group.description }}</p>
+              </div>
+              <strong><span class="visible-count">{{ group.matches|length }}</span>개 유형</strong>
+            </header>
+            {% if group.matches %}
+            <div class="match-list">
+              {% for match in group.matches %}
+              <article class="match-card" data-mbti="{{ match.mbti }}" data-rank="{{ match.rank }}">
+                <div class="match-summary">
+                  <span class="rank-badge">{{ match.rank }}위</span>
+                  <h3>{{ match.mbti }}</h3>
+                  <div class="total-score"><strong>{{ match.total_display }}</strong><span>종합 점수</span></div>
+                </div>
+                <div class="match-note">
+                  <strong>{{ match.stage }}</strong>
+                  <span>{{ match.description }}</span>
+                </div>
+                <dl class="factor-grid">
+                  <div><dt>일반 호환성</dt><dd class="{{ match.factor_highlights.general }}">{{ match.general }}</dd></div>
+                  <div><dt>연인관계</dt><dd class="{{ match.factor_highlights.relationship }}">{{ match.relationship }}</dd></div>
+                  <div><dt>갈등회복력</dt><dd class="{{ match.factor_highlights.conflict }}">{{ match.conflict }}</dd></div>
+                  <div><dt>표현방식</dt><dd class="{{ match.factor_highlights.expression }}">{{ match.expression }}</dd></div>
+                </dl>
+              </article>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-group">해당 급간의 MBTI가 없어요.</p>
+            {% endif %}
+          </section>
+          {% endfor %}
+          </div>
+
+          <p class="no-search-result" id="noSearchResult" hidden>검색한 MBTI 결과가 없어요.</p>
+
+          <button class="main-btn secondary-btn" type="button" onclick="window.location='/'">다시 선택하기</button>
+        </div>
         {% endif %}
       </section>
     </main>
+    {% if match_groups is defined %}
+    <script>
+      const matchGroups = document.getElementById('matchGroups');
+      const mbtiAxisFilters = Array.from(document.querySelectorAll('.mbti-axis-filter'));
+      const sortToggle = document.getElementById('sortToggle');
+      const noSearchResult = document.getElementById('noSearchResult');
+
+      function applyResultControls() {
+        let totalVisible = 0;
+
+        document.querySelectorAll('.score-group-section').forEach((section) => {
+          let visibleInGroup = 0;
+          section.querySelectorAll('.match-card').forEach((card) => {
+            const isVisible = mbtiAxisFilters.every((filter) => {
+              return filter.value === '' || card.dataset.mbti[Number(filter.dataset.index)] === filter.value;
+            });
+            card.hidden = !isVisible;
+            if (isVisible) visibleInGroup += 1;
+          });
+
+          section.querySelector('.visible-count').textContent = visibleInGroup;
+          section.hidden = visibleInGroup === 0;
+          totalVisible += visibleInGroup;
+        });
+
+        noSearchResult.hidden = totalVisible > 0;
+      }
+
+      function setSortDirection(direction) {
+        const sections = Array.from(matchGroups.querySelectorAll('.score-group-section'));
+        const orderedSections = direction === 'asc' ? sections.reverse() : sections.sort((a, b) => a.dataset.groupIndex - b.dataset.groupIndex);
+
+        orderedSections.forEach((section) => {
+          const list = section.querySelector('.match-list');
+          if (list) {
+            const cards = Array.from(list.querySelectorAll('.match-card'));
+            cards
+              .sort((a, b) => direction === 'asc' ? b.dataset.rank - a.dataset.rank : a.dataset.rank - b.dataset.rank)
+              .forEach((card) => list.appendChild(card));
+          }
+          matchGroups.appendChild(section);
+        });
+
+        sortToggle.dataset.direction = direction;
+        sortToggle.textContent = direction === 'asc' ? '높은 점수순 보기' : '낮은 점수순 보기';
+      }
+
+      mbtiAxisFilters.forEach((filter) => {
+        filter.addEventListener('change', applyResultControls);
+      });
+      sortToggle.addEventListener('click', () => {
+        const nextDirection = sortToggle.dataset.direction === 'desc' ? 'asc' : 'desc';
+        setSortDirection(nextDirection);
+        applyResultControls();
+      });
+    </script>
+    {% endif %}
   </body>
 </html>
